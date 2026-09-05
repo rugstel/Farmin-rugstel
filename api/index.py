@@ -1,11 +1,12 @@
 import sys
 import os
 import asyncio
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+import aiohttp
 
 # ========== ИНИЦИАЛИЗАЦИЯ ==========
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -15,7 +16,7 @@ if not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# ========== ВАШИ ХЕНДЛЕРЫ (КОПИРУЙТЕ ВАШ КОД) ==========
+# ========== ВАШИ ХЕНДЛЕРЫ ==========
 def get_mining_keyboard(income: int = 1) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text=f"⛏ Копать (+{income})", callback_data="mine")
@@ -40,6 +41,10 @@ async def webhook(request: Request):
     update_data = await request.json()
     update = types.Update(**update_data)
     await dp.process_update(update)
+    
+    # Закрываем сессию бота после обработки
+    await bot.session.close()
+    
     return {"status": "ok"}
 
 @app.on_event("startup")
@@ -47,3 +52,7 @@ async def on_startup():
     webhook_url = "https://" + os.getenv("VERCEL_URL", "localhost") + "/api/bot"
     await bot.set_webhook(webhook_url)
     print(f"Webhook set to: {webhook_url}")
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await bot.session.close()
